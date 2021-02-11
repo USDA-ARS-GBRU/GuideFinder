@@ -4,11 +4,11 @@
 import os
 from typing import List, Dict, Tuple
 import logging
-from itertools import product, tee
+from itertools import product
 import gzip
 import hashlib
 import statistics
-from collections import deque
+from collections import Counter
 import numpy as np
 from Bio.Seq import Seq
 from Bio import SeqIO
@@ -34,17 +34,6 @@ class Pam:
 
     """
 
-    def extend_ambiguous_dna(self, pam) -> None:
-        """convert ambiguous DNA input to return frozen set of all sequences
-        Args:
-            pam (str): a pam seq (all caps)
-        Returns:
-            (frozenset): all possible sequences given an ambiguous DNA input
-
-        """
-
-
-
     def __init__(self, pam: str, pam_orientation: str) -> None:
         """Pam __init__
 
@@ -64,12 +53,11 @@ class Pam:
         return "A PAM object: {self.pam}".format(self=self)
     
 
-    def find_targets(self, seq_record_iter: object, strand: str, target_len: int) -> List[object]:
-        """Find all targets on a sequence that match for the PAM on the requested strand(s)
+    def find_targets(self, seq_record_iter: object, target_len: int) -> List[object]:
+        """Find all targets on a sequence that match for the PAM on both strand(s)
 
         Args:
             seq_record_iter (object): A Biopython SeqRecord iterator from SeqIO.parse
-            strand (str): The strand to search choices: ["forward", "reverse", "both"]
             target_len (int): The length of the target sequence
         Returns:
             list: A list of Target class instances
@@ -80,8 +68,8 @@ class Pam:
         def reverse_complement(seq: str) -> object:
             """reverse complement of the PAM sequence
             """
-            pamseq = Seq(seq)
-            return str(pamseq.reverse_complement())
+            bpseq = Seq(seq)
+            return str(bpseq.reverse_complement())
 
 
         def pam2re(pam) -> str:
@@ -158,19 +146,9 @@ class Pam:
                 id = record.id
                 seq =str(record.seq)
                 if self.pam_orientation == "5prime":
-                    if strand == "forward":
-                        run_for_5p(pam2re(self.pam))
-                    if strand == "reverse":
-                        run_rev_5p(pam2re(reverse_complement(self.pam)))
-                    if strand == "both":
                         run_for_5p(pam2re(self.pam))
                         run_rev_5p(pam2re(reverse_complement(self.pam)))
                 elif self.pam_orientation == "3prime":
-                    if strand == "forward":
-                        run_for_3p(pam2re(self.pam))
-                    if strand == "reverse":
-                        run_rev_3p(pam2re(reverse_complement(self.pam)))
-                    if strand == "both":
                         run_for_3p(pam2re(self.pam))
                         run_rev_3p(pam2re(reverse_complement(self.pam)))
         gc.collect() # clear memory after each chromosome
@@ -236,16 +214,14 @@ class TargetList:
         """Check for restriction enzymes
         
         Returns:
-            None (but restriction enzyme checked tagets to self and targets are updated)
+            None (but restriction enzyme checked targets to self and targets are updated)
         """
-        from Bio import Seq # somehow if you import these two prior PAM class has eror as [TypeError: 'module' object is not callable]
-        from itertools import product
         dna_dict = Seq.IUPAC.IUPACData.ambiguous_dna_values
-        extend_list= list()
+        extend_list = list()
         for record in set(restriction_enzyme_list):
             extend_list.append(list(map("".join, product(*map(dna_dict.get, record)))))
-        element_to_exclude = frozenset(sum(extend_list, [])) # flat out the compount list and make frozenset
-        # retrive targets if doesnot contain the strings specify in the restriction enzyme list
+        element_to_exclude = frozenset(sum(extend_list, [])) # flatten out the compound list and make frozenset
+        # retrieve target object if they not contain the strings specify in the restriction enzyme list
         self.targets = [x for x in  self.targets if not any(restenzyme in x.seq for restenzyme in element_to_exclude)]
 
 
@@ -271,37 +247,24 @@ class TargetList:
         Args:
             lcp (int): Length of conserved sequence close to PAM
         """
-        def _get_prox(target):
+        def get_prox(target):
+            if self.lcp == 0:
+                return target.seq
             if target.pam_orientation == "5prime":
-            	if self.lcp == 0:
-            		return target.seq
-            	else:
-            		return target.seq[0:self.lcp]
+            	return target.seq[0:self.lcp]
             elif target.pam_orientation == "3prime":
-            	if self.lcp == 0:
-            		return target.seq
-            	else:
                 	return target.seq[(len(target) - self.lcp):]
-        lcp_dict ={}
-        for target in self.targets:
-            proximal = _get_prox(target)
-            if proximal in lcp_dict.keys():
-                lcp_dict[proximal].append(target)
-            else:
-                lcp_dict[proximal] = [target]
-        filteredlist = deque()
-        for lkey, lval in lcp_dict.items():
-            if len(lval) == 1:
-                filteredlist.append(lval[0])
-        self.unique_targets = list(filteredlist)
 
-    def _make_full_unique_targets(self):
-        full_targerts= []
-        for unq_target in self.unique_targets:
-            full_targerts.append(str(unq_target.seq))
-        full_unique = set(full_targerts)
-        return full_unique
-        
+        prox_counter = Counter([get_prox(target) for target in self.targets])
+
+        def is_unique(target):
+            prox = get_prox(target)
+            if prox_counter[prox] > 1:
+                return False
+            return True
+
+        self.unique_targets =  [tar for tar in filter(is_unique, self.targets)]
+
 
     def create_index(self, M: int=16, num_threads=2, efC: int=10, post=1) -> None:
         """Create nmslib index
@@ -324,7 +287,7 @@ class TargetList:
 
 
         logging.info("unique targets for index: %s" % len(self.targets))
-        bintargets = self._one_hot_encode(self.targets)
+        bintargets = list(set(self._one_hot_encode(self.targets))) # dereplicate target sequences after encoding in bin
         index_params = {'M': M, 'indexThreadQty': num_threads,'efConstruction': efC, 'post': post}
         index = nmslib.init(space='bit_hamming',
                             dtype=nmslib.DistType.INT,
@@ -358,7 +321,7 @@ class TargetList:
             queryseq = self.unique_targets[i].seq
             hitseqidx = list(entry[0])
             hammingdist = list(entry[1])
-            if hammingdist[1] >= 2 * self.hammingdist: # multiply by 4 b/c each base is one hot encoded in 4 bits
+            if hammingdist[1] >= 2 * self.hammingdist: # multiply by 2 b/c each base is one hot encoded in 4 bits
                 neighbors = {"seqs": [self.targets[x].seq for x in hitseqidx], # reverse this?
                              "dist": [int(x/2) for x in hammingdist]}
                 neighbor_dict[queryseq] = {"target": self.unique_targets[i],

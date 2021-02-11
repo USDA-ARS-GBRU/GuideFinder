@@ -20,9 +20,8 @@ def myparser():
     parser.add_argument('--outdir', '-o', type=str, required=True, help='The directory for data output')
     parser.add_argument('--pam_orientation', '-r', choices=['5prime', '3prime'], default='5prime', help="PAM position relative to target: 5prime: [PAM][target], 3prime: [target][PAM]. For example, Cas9 is 3prime")
     parser.add_argument('--guidelength', '-l', type=int, default=20, choices=range(10, 28, 1), metavar="[10-27]" ,help='Length of the guide sequence')
-    parser.add_argument('--strand', '-s', choices=['forward','reverse', 'both'], default='both', help='Strand of DNA to search')
     parser.add_argument('--lcp', type=int, default=10,choices=range(0, 28, 1), metavar="[0-27]", help='Length of the guide closest to  the PAM required to be unique')
-    parser.add_argument('--dist', type=int, choices=range(0, 6, 1),  metavar="[0-5]", default=2, help='Minimum hamming distance from any other potential guide')
+    parser.add_argument('--dist', type=int, choices=range(1, 6, 1),  metavar="[1-5]", default=2, help='Minimum hamming distance from any other potential guide')
     parser.add_argument('--before', type=int, default=100, choices=range(1, 501, 1), metavar="[1-500]",
                         help='keep guides this far in front of a feature')
     parser.add_argument('--into', type=int, default=200, choices=range(1, 501, 1),metavar="[1-500]",
@@ -84,7 +83,7 @@ def main(arglist: list=None):
         if args.tempdir:
             if not os.path.exists(args.tempdir):
                 logging.warning("Specified location for tempfile (%s) does not \
-                                 exist, using default location." % tempdir )
+                                 exist, using default location." % args.tempdir )
                 tempdir = tempfile.mkdtemp(prefix='guidemaker_')
         else:
             tempdir = tempfile.mkdtemp(prefix='guidemaker_', dir=args.tempdir)
@@ -95,10 +94,10 @@ def main(arglist: list=None):
         logging.info("Identifying PAM sites in the genome")
         pamobj = guidemaker.core.Pam(args.pamseq, args.pam_orientation)
         seq_record_iter = SeqIO.parse(fastapath, "fasta")
-        pamtargets = pamobj.find_targets(seq_record_iter=seq_record_iter, strand="both", target_len=args.guidelength)
+        pamtargets = pamobj.find_targets(seq_record_iter=seq_record_iter, target_len=args.guidelength)
         tl = guidemaker.core.TargetList(targets=pamtargets, lcp=args.lcp, hammingdist=args.dist, knum=args.knum)
         lengthoftl= len(tl)
-        logging.info("Checking guides for restriction enzymes")
+        logging.info("Checking guides for restriction enzyme sites")
         tl.check_restriction_enzymes(restriction_enzyme_list=args.restriction_enzyme_list)
         logging.info("Number of guides removed after checking for restriction enzymes: %d", (lengthoftl - len(tl)))
         logging.info("Identifing guides that are unique near the PAM site")
@@ -142,7 +141,6 @@ def main(arglist: list=None):
         logging.info("guidemaker completed, results are at %s" % args.outdir)
         logging.info("PAM sequence: %s" % args.pamseq)
         logging.info("PAM orientation: %s" % args.pam_orientation)
-        logging.info("Genome strand(s) searched: %s" % args.strand)
         logging.info("Total PAM sites considered: %d" % lengthoftl)
         logging.info("Guide RNA candidates found: %d" % len(prettydf))
 

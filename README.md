@@ -98,4 +98,4 @@ API documentation for the module can be found [here](/html/guidemaker/index.html
 
 ## License information
 
-As a work of the United State Governemnt this software is available under  CC0 1.0 Universal (CC0 1.0) Public Domain Dedication
+As a work of the United States Government this software is not copyrightable under U.S.C 17 Section  105 but is available under CC0 1.0 Universal (CC0 1.0) Public Domain Dedication

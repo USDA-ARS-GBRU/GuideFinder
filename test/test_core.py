@@ -26,43 +26,21 @@ pamobj = guidemaker.core.Pam("NGG", "5prime")
 
 
 
-def test_pam_find_targets_3f():
+def test_pam_find_targets_3b():
     pamobj = guidemaker.core.Pam("NGG", "3prime")
     testseq1 = [SeqRecord(Seq("AATGATCTGGATGCACATGCACTGCTAGCAGCTGCATGAAAA",
                              alphabet=IUPAC.ambiguous_dna), id="testseq1")]
-    target = pamobj.find_targets(seq_record_iter=testseq1, strand="forward", target_len=6)
+    target = pamobj.find_targets(seq_record_iter=testseq1, target_len=6)
     assert str(target[0].seq) == "ATGATC"
 
 
-def test_pam_find_targets_5f():
-    pamobj = guidemaker.core.Pam("NGG", "5prime")
-    testseq1 = [SeqRecord(Seq("AATGATCTGGATGCACATGCACTGCTAGCAGCTGCATGAAAA",
-                             alphabet=IUPAC.ambiguous_dna), id="testseq1")]
-    target = pamobj.find_targets(seq_record_iter=testseq1, strand="forward", target_len=6)
-    assert str(target[0].seq) == "ATGCAC"
-
-
-def test_pam_find_targets_3r():
-    pamobj = guidemaker.core.Pam("NGG", "3prime")
-    testseq1 = [SeqRecord(Seq("AATGATCTGGATGCACATGCACTGCTCCAAGCTGCATGAAAA",
-                             alphabet=IUPAC.ambiguous_dna), id="testseq1")]
-    target = pamobj.find_targets(seq_record_iter=testseq1, strand="reverse", target_len=6)
-    assert str(target[0].seq) == "GCAGCT"
-
-
-def test_pam_find_targets_5r():
-    pamobj = guidemaker.core.Pam("NGG", "5prime")
-    testseq1 = [SeqRecord(Seq("AATGATCTGGATGCACATGCACTGCTCCAAGCTGCATGAAAA",
-                             alphabet=IUPAC.ambiguous_dna), id="testseq1")]
-    target = pamobj.find_targets(seq_record_iter=testseq1, strand="reverse", target_len=6)
-    assert str(target[0].seq) == "AGCAGT"
 
 
 def test_pam_find_targets_5b():
     pamobj = guidemaker.core.Pam("NGG", "5prime")
     testseq1 = [SeqRecord(Seq("AATGATCTGGATGCACATGCACTGCTCCAAGCTGCATGAAAA",
                              alphabet=IUPAC.ambiguous_dna), id="testseq1")]
-    target = pamobj.find_targets(seq_record_iter=testseq1, strand="both", target_len=6)
+    target = pamobj.find_targets(seq_record_iter=testseq1,  target_len=6)
     assert str(target[0].seq) == "ATGCAC"
     assert str(target[1].seq) == "AGCAGT"
 
@@ -86,7 +64,8 @@ def test_target():
 
 
 targets = [guidemaker.Target(seq="ATGCACATGCACTGCTGGAT",
-                                   exact_pam="NGG", strand="forward",
+                                   exact_pam="NGG",
+                                   strand="forward",
                                    pam_orientation="5prime",
                                    seqid="NC_002516",
                                    start=410,
@@ -170,7 +149,7 @@ def test_get_qualifiers():
 def test_get_nearby_features(tmp_path):
     pamobj = guidemaker.core.Pam("NGG", "5prime")
     gb = SeqIO.parse("test/test_data/Pseudomonas_aeruginosa_PAO1_107.sample.fasta", "fasta")
-    targets = pamobj.find_targets(seq_record_iter=gb, strand="forward", target_len=20)
+    targets = pamobj.find_targets(seq_record_iter=gb, target_len=20)
     for tar in targets:
         if len(tar.seq) < 20:
             print(str(tar.start) + ", " + str(tar.stop) + ", " + tar.seq)
@@ -188,7 +167,7 @@ def test_get_nearby_features(tmp_path):
 def test_get_control_seqs():
     pamobj = guidemaker.core.Pam("NGG", "5prime")
     gb = SeqIO.parse("test/test_data/Pseudomonas_aeruginosa_PAO1_107.sample.fasta", "fasta")
-    targets = pamobj.find_targets(seq_record_iter=gb, strand="forward", target_len=20)
+    targets = pamobj.find_targets(seq_record_iter=gb, target_len=20)
     tl = guidemaker.core.TargetList(targets=targets, lcp=10, hammingdist=2, knum=2)
     tl.find_unique_near_pam()
     tl.create_index()
@@ -198,7 +177,7 @@ def test_get_control_seqs():
 def test_filter_features():
     pamobj = guidemaker.core.Pam("NGG", "5prime")
     gb = SeqIO.parse("test/test_data/Pseudomonas_aeruginosa_PAO1_107.sample.fasta", "fasta")
-    pamtargets = pamobj.find_targets(seq_record_iter=gb, strand="both", target_len=20)
+    pamtargets = pamobj.find_targets(seq_record_iter=gb, target_len=20)
     tl = guidemaker.core.TargetList(targets=pamtargets, lcp=10, hammingdist=2, knum=2)
     tl.find_unique_near_pam()
     tl.create_index()
@@ -214,6 +193,6 @@ def test_filter_features():
     assert prettydf.shape == (2141, 21)
 
 def test_get_fastas(tmp_path):
-    gbfiles = ["test/test_data/Burkholderia_thailandensis_E264__ATCC_700388_133.gbk.gz",
+    gbfiles = ["test/test_data/Burkholderia_thailandensis_E264_ATCC_700388_133.gbk.gz",
                "test/test_data/Pseudomonas_aeruginosa_PAO1_107.gbk"]
     guidemaker.core.get_fastas(gbfiles, tmp_path)
